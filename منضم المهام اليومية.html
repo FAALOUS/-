@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظم المهام اليومية</title>
+        <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>منظم المهام اليومية</h1>
+            <p>نظم وقتك ومهامك بشكل فعال</p>
+        </header>
+        
+        <div class="date-section">
+            <div class="current-date" id="current-date">الأحد 12 أبريل 2025</div>
+            <div class="current-time" id="current-time">12:00:00</div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>ملخص اليوم</h2>
+                <div>
+                    <p>المهام المكتملة: <span id="completed-count">0</span>/<span id="total-count">0</span></p>
+                    <p>المهام المتبقية: <span id="remaining-count">0</span></p>
+                    <p>نسبة الإنجاز: <span id="completion-rate">0%</span></p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>أولويات اليوم</h2>
+                <div id="priorities-list">
+                    <p>لا توجد مهام ذات أولوية عالية اليوم.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-form">
+            <h2>إضافة مهمة جديدة</h2>
+            <form id="new-task-form">
+                <div class="form-group">
+                    <label for="task-name">اسم المهمة</label>
+                    <input type="text" id="task-name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-desc">وصف المهمة</label>
+                    <textarea id="task-desc" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-date">تاريخ الاستحقاق</label>
+                    <input type="date" id="task-date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-time">وقت الاستحقاق</label>
+                    <input type="time" id="task-time">
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-priority">الأولوية</label>
+                    <select id="task-priority">
+                        <option value="low">منخفضة</option>
+                        <option value="medium" selected>متوسطة</option>
+                        <option value="high">عالية</option>
+                    </select>
+                </div>
+                
+                <button type="submit">إضافة المهمة</button>
+            </form>
+        </div>
+        
+        <div class="task-list">
+            <h2>قائمة المهام</h2>
+            
+            <div class="filters">
+                <select id="filter-status">
+                    <option value="all">جميع المهام</option>
+                    <option value="active">المهام النشطة</option>
+                    <option value="completed">المهام المكتملة</option>
+                </select>
+                <select id="filter-priority">
+                    <option value="all">جميع الأولويات</option>
+                    <option value="high">أولوية عالية</option>
+                    <option value="medium">أولوية متوسطة</option>
+                    <option value="low">أولوية منخفضة</option>
+                </select>
+                <select id="filter-date">
+                    <option value="all">جميع التواريخ</option>
+                    <option value="today">اليوم</option>
+                    <option value="week">هذا الأسبوع</option>
+                    <option value="month">هذا الشهر</option>
+                </select>
+            </div>
+            
+            <div id="tasks-container">
+                <!-- المهام ستظهر هنا -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // إدارة التاريخ والوقت
+        function updateDateTime() {
+            const now = new Date();
+            
+            // تنسيق التاريخ بالعربية لكن بالأرقام الهندية (1,2,3)
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', numberingSystem: 'latn' };
+            const dateStr = now.toLocaleDateString('ar-DZ', options);
+            
+            // تنسيق الوقت بالأرقام الهندية
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', numberingSystem: 'latn' };
+            const timeStr = now.toLocaleTimeString('ar-DZ', timeOptions);
+            
+            document.getElementById('current-date').textContent = dateStr;
+            document.getElementById('current-time').textContent = timeStr;
+        }
+        
+        // تحديث التاريخ والوقت كل ثانية
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+        
+        // إدارة المهام
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        
+        function saveTasksToLocalStorage() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+        
+        function renderTasks() {
+            const tasksContainer = document.getElementById('tasks-container');
+            const statusFilter = document.getElementById('filter-status').value;
+            const priorityFilter = document.getElementById('filter-priority').value;
+            const dateFilter = document.getElementById('filter-date').value;
+            
+            // تطبيق التصفية
+            let filteredTasks = [...tasks];
+            
+            if (statusFilter === 'active') {
+                filteredTasks = filteredTasks.filter(task => !task.completed);
+            } else if (statusFilter === 'completed') {
+                filteredTasks = filteredTasks.filter(task => task.completed);
+            }
+            
+            if (priorityFilter !== 'all') {
+                filteredTasks = filteredTasks.filter(task => task.priority === priorityFilter);
+            }
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (dateFilter === 'today') {
+                filteredTasks = filteredTasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === today.getTime();
+                });
+            } else if (dateFilter === 'week') {
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay());
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+                
+                filteredTasks = filteredTasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    return taskDate >= weekStart && taskDate <= weekEnd;
+                });
+            } else if (dateFilter === 'month') {
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                
+                filteredTasks = filteredTasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    return taskDate >= monthStart && taskDate <= monthEnd;
+                });
+            }
+            
+            // ترتيب المهام
+            filteredTasks.sort((a, b) => {
+                // ترتيب حسب الإكمال
+                if (a.completed && !b.completed) return 1;
+                if (!a.completed && b.completed) return -1;
+                
+                // ترتيب حسب الأولوية
+                const priorityOrder = { high: 0, medium: 1, low: 2 };
+                if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+                    return priorityOrder[a.priority] - priorityOrder[b.priority];
+                }
+                
+                // ترتيب حسب التاريخ
+                return new Date(a.date) - new Date(b.date);
+            });
+            
+            // عرض المهام
+            if (filteredTasks.length === 0) {
+                tasksContainer.innerHTML = '<p>لا توجد مهام في هذا التصنيف.</p>';
+                return;
+            }
+            
+            tasksContainer.innerHTML = '';
+            
+            filteredTasks.forEach((task, index) => {
+                const taskItem = document.createElement('div');
+                taskItem.className = `task-item priority-${task.priority}`;
+                if (task.completed) {
+                    taskItem.classList.add('completed');
+                }
+                
+                const taskDate = new Date(task.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isLate = taskDate < today && !task.completed;
+                
+                // تنسيق التاريخ بالعربية بالأرقام الهندية
+                const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', numberingSystem: 'latn' };
+                const formattedDate = taskDate.toLocaleDateString('ar-DZ', dateOptions);
+                
+                // تحديد مسمى الأولوية بالعربية
+                const priorityNames = {
+                    high: 'عالية',
+                    medium: 'متوسطة',
+                    low: 'منخفضة'
+                };
+                
+                const priorityName = priorityNames[task.priority];
+                
+                taskItem.innerHTML = `
+                    <div class="task-details">
+                        <div class="task-name">${task.name}</div>
+                        <div class="task-desc">${task.desc || ''}</div>
+                        <div class="task-date">
+                            <span class="priority-badge priority-${task.priority}">${priorityName}</span>
+                            ${formattedDate} ${task.time || ''}
+                            ${isLate ? '<span style="color: #e74c3c;"> (متأخرة)</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        <button class="btn-complete" onclick="toggleCompleteTask(${task.id})">
+                            ${task.completed ? 'إلغاء الإكمال' : 'إكمال'}
+                        </button>
+                        <button class="btn-edit" onclick="editTask(${task.id})">تعديل</button>
+                        <button class="btn-delete" onclick="deleteTask(${task.id})">حذف</button>
+                    </div>
+                `;
+                
+                tasksContainer.appendChild(taskItem);
+            });
+            
+            updateTaskSummary();
+        }
+        
+        function updateTaskSummary() {
+            const totalTasks = tasks.length;
+            const completedTasks = tasks.filter(task => task.completed).length;
+            const remainingTasks = totalTasks - completedTasks;
+            const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            // استخدام الأرقام الهندية مباشرة (بدون تحويل)
+            document.getElementById('total-count').textContent = totalTasks;
+            document.getElementById('completed-count').textContent = completedTasks;
+            document.getElementById('remaining-count').textContent = remainingTasks;
+            document.getElementById('completion-rate').textContent = `${completionRate}%`;
+            
+            // تحديث قائمة الأولويات
+            const prioritiesList = document.getElementById('priorities-list');
+            const highPriorityTasks = tasks.filter(task => task.priority === 'high' && !task.completed);
+            
+            if (highPriorityTasks.length === 0) {
+                prioritiesList.innerHTML = '<p>لا توجد مهام ذات أولوية عالية اليوم.</p>';
+                return;
+            }
+            
+            prioritiesList.innerHTML = '';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            highPriorityTasks
+                .filter(task => {
+                    const taskDate = new Date(task.date);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === today.getTime();
+                })
+                .slice(0, 3)
+                .forEach(task => {
+                    const taskItem = document.createElement('div');
+                    taskItem.innerHTML = `<p>• ${task.name}</p>`;
+                    prioritiesList.appendChild(taskItem);
+                });
+        }
+        
+        function addTask(task) {
+            const newId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
+            const newTask = {
+                id: newId,
+                name: task.name,
+                desc: task.desc,
+                date: task.date,
+                time: task.time,
+                priority: task.priority,
+                completed: false
+            };
+            
+            tasks.push(newTask);
+            saveTasksToLocalStorage();
+            renderTasks();
+        }
+        
+        function toggleCompleteTask(id) {
+            const taskIndex = tasks.findIndex(task => task.id === id);
+            if (taskIndex !== -1) {
+                tasks[taskIndex].completed = !tasks[taskIndex].completed;
+                saveTasksToLocalStorage();
+                renderTasks();
+            }
+        }
+        
+        function deleteTask(id) {
+            if (confirm('هل أنت متأكد من رغبتك في حذف هذه المهمة؟')) {
+                tasks = tasks.filter(task => task.id !== id);
+                saveTasksToLocalStorage();
+                renderTasks();
+            }
+        }
+        
+        function editTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            
+            // تعبئة نموذج التعديل
+            document.getElementById('task-name').value = task.name;
+            document.getElementById('task-desc').value = task.desc || '';
+            document.getElementById('task-date').value = task.date;
+            document.getElementById('task-time').value = task.time || '';
+            document.getElementById('task-priority').value = task.priority;
+            
+            // تغيير زر الإرسال
+            const submitButton = document.querySelector('#new-task-form button[type="submit"]');
+            submitButton.textContent = 'تحديث المهمة';
+            
+            // إضافة معرف المهمة المعدلة
+            document.getElementById('new-task-form').dataset.editId = id;
+            
+            // التمرير إلى النموذج
+            document.querySelector('.task-form').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // استماع للنماذج والأحداث
+        document.getElementById('new-task-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const taskName = document.getElementById('task-name').value;
+            const taskDesc = document.getElementById('task-desc').value;
+            const taskDate = document.getElementById('task-date').value;
+            const taskTime = document.getElementById('task-time').value;
+            const taskPriority = document.getElementById('task-priority').value;
+            
+            const editId = this.dataset.editId;
+            
+            if (editId) {
+                // تحديث مهمة موجودة
+                const taskIndex = tasks.findIndex(task => task.id === parseInt(editId));
+                if (taskIndex !== -1) {
+                    tasks[taskIndex].name = taskName;
+                    tasks[taskIndex].desc = taskDesc;
+                    tasks[taskIndex].date = taskDate;
+                    tasks[taskIndex].time = taskTime;
+                    tasks[taskIndex].priority = taskPriority;
+                    
+                    // إعادة زر الإرسال وإزالة معرف التعديل
+                    document.querySelector('#new-task-form button[type="submit"]').textContent = 'إضافة المهمة';
+                    delete this.dataset.editId;
+                }
+            } else {
+                // إضافة مهمة جديدة
+                addTask({
+                    name: taskName,
+                    desc: taskDesc,
+                    date: taskDate,
+                    time: taskTime,
+                    priority: taskPriority
+                });
+            }
+            
+            // إعادة تعيين النموذج
+            this.reset();
+            
+            // حفظ وتحديث
+            saveTasksToLocalStorage();
+            renderTasks();
+        });
+        
+        // استماع لتغييرات التصفية
+        document.getElementById('filter-status').addEventListener('change', renderTasks);
+        document.getElementById('filter-priority').addEventListener('change', renderTasks);
+        document.getElementById('filter-date').addEventListener('change', renderTasks);
+        
+        // تهيئة العرض الأولي
+        renderTasks();
+    </script>
+</body>
+</html>
